@@ -76,6 +76,26 @@
   .card-head h2{font-size:13px; font-weight:600; color:var(--muted); letter-spacing:.3px}
   .link{font-size:12px; color:var(--accent); font-weight:500}
 
+  /* ---------- 算一算 ---------- */
+  .plan-row{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+  .plan-row:last-of-type{margin-bottom:0}
+  .plan-label{font-size:13px; color:var(--muted); width:72px; flex:none}
+  .plan-in{display:flex; align-items:center; gap:2px; background:var(--bg); border-radius:11px; padding:9px 11px; flex:1; min-width:0}
+  .plan-in span{font-size:13px; color:var(--faint)}
+  .plan-in input{width:100%; border:0; background:none; outline:none; font-size:15px; color:var(--text);
+    font-variant-numeric:tabular-nums; padding:0; font-weight:560}
+  .plan-date{border:0; background:var(--bg); border-radius:11px; padding:9px 11px; font-size:14px; color:var(--text);
+    outline:none; -webkit-appearance:none; appearance:none; font-family:inherit; font-variant-numeric:tabular-nums;
+    flex:1; min-width:0; width:100%}
+  .plan-result{margin-top:14px; padding-top:14px; border-top:1px solid var(--line)}
+  .pr-main{display:flex; align-items:baseline; gap:8px}
+  .pr-main span{font-size:12.5px; color:var(--muted)}
+  .pr-main b{font-size:26px; font-weight:640; letter-spacing:-.4px}
+  .pr-main b.neg{color:var(--danger)}
+  .pr-sub{font-size:12px; color:var(--faint); margin-top:5px; line-height:1.65}
+  .pr-tip{font-size:12px; color:var(--accent); margin-top:6px; line-height:1.65}
+  .pr-tip.warn{color:var(--danger)}
+
   /* ---------- category bars ---------- */
   .catrow{display:flex; align-items:center; gap:10px; padding:7px 0}
   .catrow .ico{width:30px; height:30px; border-radius:10px; background:var(--accent-weak); display:grid; place-items:center; font-size:15px; flex:none}
@@ -190,6 +210,22 @@
     <div><span>本期已花</span><b class="num" id="stSpent">¥0.00</b></div>
     <div><span>上期结转</span><b class="num" id="stCarry">¥0.00</b></div>
   </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>算一算</h2>
+    <button class="link" id="planReset">用实际日均</button>
+  </div>
+  <div class="plan-row">
+    <span class="plan-label">每天大约花</span>
+    <label class="plan-in"><span>¥</span><input id="planDaily" type="text" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+  </div>
+  <div class="plan-row">
+    <span class="plan-label">想撑到</span>
+    <input id="planDate" type="date" class="plan-date">
+  </div>
+  <div class="plan-result" id="planResult"></div>
 </section>
 
 <section class="card">
@@ -389,6 +425,20 @@ function computeSummary(data, tk){
     periodCount: expenses.filter(inNow).length
   };
 }
+
+// 按某个日均消费，预测「撑到某天」还剩多少钱
+function projectSpending(sum, daily, target){
+  var d = Math.max(0, Number(daily) || 0);
+  var days = Math.max(0, diffDays(sum.today, target));
+  var spend = round2(d * days);
+  var left = round2(sum.remaining - spend);
+  var surviveDays = d > 0 ? Math.floor(Math.max(0, sum.remaining) / d) : Infinity;
+  var maxDaily = days > 0 ? round2(sum.remaining / days) : null;
+  return {
+    days: days, daily: d, spend: spend, left: left,
+    covers: left >= 0, surviveDays: surviveDays, maxDaily: maxDaily
+  };
+}
 /* ==== LOGIC:END ==== */
 </script>
 
@@ -431,7 +481,8 @@ function computeSummary(data, tk){
         { id:'c_social', name:'社交',   emoji:'🍻' }
       ],
       expenses: [],
-      incomes: []
+      incomes: [],
+      plan: { daily: null, target: null }
     };
   }
 
@@ -445,6 +496,7 @@ function computeSummary(data, tk){
       d.categories = Array.isArray(d.categories) && d.categories.length ? d.categories : defaults().categories;
       d.expenses = Array.isArray(d.expenses) ? d.expenses : [];
       d.incomes  = Array.isArray(d.incomes)  ? d.incomes  : [];
+      if (!d.plan || typeof d.plan !== 'object') d.plan = { daily: null, target: null };
       return d;
     } catch (e) { return defaults(); }
   }
@@ -503,6 +555,7 @@ function computeSummary(data, tk){
 
     renderCats(s);
     renderFlow();
+    renderPlan(s);
   }
 
   function renderCats(s){
@@ -589,6 +642,105 @@ function computeSummary(data, tk){
   }
 
   function safeStart(it){ return it.date; }
+
+  /* ---------------- 算一算 ---------------- */
+  function planDailyValue(){
+    var v = state.plan && state.plan.daily;
+    if (v === null || v === undefined || v === '') return null;
+    var n = Number(v);
+    return isFinite(n) && n >= 0 ? round2(n) : null;
+  }
+
+  // 本期到现在为止的平均每天花多少
+  function actualDaily(s){
+    var elapsed = diffDays(s.start, s.today) + 1;
+    if (elapsed <= 0 || !s.periodSpent) return null;
+    return round2(s.periodSpent / elapsed);
+  }
+
+  function planTargetValue(s){
+    var t = state.plan && state.plan.target;
+    if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(t) || t < s.today) t = s.next;
+    return t;
+  }
+
+  function renderPlan(s){
+    var target = planTargetValue(s);
+    if (state.plan.target !== target) { state.plan.target = target; save(); }
+
+    var dateEl = $('#planDate');
+    if (dateEl.value !== target) dateEl.value = target;
+    dateEl.min = s.today;
+
+    var daily = planDailyValue();
+    if (daily === null) daily = actualDaily(s);   // 没填过就先按实际日均显示（不写进存档）
+
+    var inputEl = $('#planDaily');
+    var want = daily === null ? '' : String(daily);
+    if (inputEl.value !== want && document.activeElement !== inputEl) inputEl.value = want;
+
+    var el = $('#planResult');
+    if (daily === null) {
+      el.innerHTML = '<div class="pr-sub">填个日均就能算。也可以先记两笔，我按本期实际日均帮你填上。</div>';
+      return;
+    }
+
+    var p = projectSpending(s, daily, target);
+    var html = '';
+
+    if (p.left >= 0) {
+      html += '<div class="pr-main"><span>到 ' + mdCn(target) + ' 预计还剩</span>' +
+              '<b class="num">' + money(p.left) + '</b></div>';
+      html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
+              '，从现在的 ' + money(s.remaining) + ' 里扣</div>';
+      if (p.days === 0) {
+        html += '<div class="pr-tip">选的是今天，没有可预测的天数。</div>';
+      } else if (p.daily === 0) {
+        html += '<div class="pr-tip">日均填 0，就是一分不花，钱能一直撑到那天。</div>';
+      } else {
+        html += '<div class="pr-tip">撑得到那天；想刚好用完，每天最多花 ' + money(p.maxDaily) + '</div>';
+      }
+    } else {
+      html += '<div class="pr-main"><span>到 ' + mdCn(target) + ' 预计差</span>' +
+              '<b class="num neg">' + money(-p.left) + '</b></div>';
+      html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
+              '，超过现在的 ' + money(s.remaining) + '</div>';
+      if (p.maxDaily === null || p.maxDaily <= 0) {
+        html += '<div class="pr-tip warn">本期已经超支了，得先把这个缺口补上。</div>';
+      } else {
+        html += '<div class="pr-tip warn">按这个花法，钱会在 ' +
+                mdCn(addDays(s.today, Math.max(0, p.surviveDays))) +
+                ' 左右见底；想撑到 ' + mdCn(target) + '，每天不能超过 ' + money(p.maxDaily) + '</div>';
+      }
+    }
+    el.innerHTML = html;
+  }
+
+  $('#planDaily').addEventListener('input', function(){
+    var raw = this.value.replace(',', '.').trim();
+    if (raw === '') state.plan.daily = null;
+    else {
+      var n = Number(raw);
+      state.plan.daily = isFinite(n) && n >= 0 ? round2(n) : null;
+    }
+    save();
+    renderPlan(computeSummary(state, dateKeyOf(new Date())));
+  });
+
+  $('#planDate').addEventListener('change', function(){
+    state.plan.target = this.value || null;
+    save();
+    renderPlan(computeSummary(state, dateKeyOf(new Date())));
+  });
+
+  $('#planReset').addEventListener('click', function(){
+    var s = computeSummary(state, dateKeyOf(new Date()));
+    var d = actualDaily(s);
+    state.plan.daily = null;
+    save();
+    renderPlan(s);
+    toast(d === null ? '本期还没支出，先记两笔' : '已按实际日均 ¥' + fmt(d) + ' 算');
+  });
 
   /* ---------------- sheets ---------------- */
   function openSheet(sel){
