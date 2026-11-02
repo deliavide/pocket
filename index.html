@@ -17,12 +17,14 @@
     --line:#e7e9ee; --accent:#0f7a63; --accent-weak:#e6f4f0; --danger:#d92d4b;
     --radius:20px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 30px rgba(16,24,40,.06);
     --hero-a:#0f1a17; --hero-b:#123b31;
+    --scrim:rgba(241,242,244,.48); --scrim-solid:rgba(241,242,244,.9);
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#08090b; --card:#14171c; --text:#eef1f5; --muted:#98a2b0; --faint:#6d7683;
       --line:#222831; --accent:#3ddcae; --accent-weak:#10261f; --danger:#ff6b81;
       --shadow:none; --hero-a:#0b1210; --hero-b:#12332b;
+      --scrim:rgba(8,9,11,.45); --scrim-solid:rgba(8,9,11,.92);
     }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
@@ -35,6 +37,19 @@
     max-width:600px; margin:0 auto;
     -webkit-font-smoothing:antialiased;
   }
+  /* 自定义背景：整屏铺满 + 一层蒙版保证文字可读
+     用 position:fixed 的伪元素而不是 background-attachment:fixed，
+     因为 iOS Safari 不支持后者（会变成随页面滚动、缩放失真） */
+  body.has-bg::before{
+    content:""; position:fixed; inset:0; z-index:-1;
+    background-image:var(--bg-img);
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+  }
+  body.has-bg::after{
+    content:""; position:fixed; inset:0; z-index:-1;
+    background:var(--scrim); pointer-events:none;
+  }
+  body.has-bg .bar-fixed{background:linear-gradient(to top, var(--scrim-solid) 55%, transparent)}
   h1,h2,h3,p{margin:0}
   button{font:inherit; color:inherit; border:0; background:none; cursor:pointer}
   .num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
@@ -91,8 +106,13 @@
   .plan-follow{display:flex; align-items:center; gap:8px; margin-top:11px; font-size:12.5px; color:var(--muted)}
   .plan-follow input{width:16px; height:16px; margin:0; accent-color:var(--accent); flex:none}
   .plan-result{margin-top:14px; padding-top:14px; border-top:1px solid var(--line)}
-  .pr-main span{display:block; font-size:12.5px; color:var(--muted); margin-bottom:3px}
-  .pr-main b{display:block; font-size:26px; font-weight:640; letter-spacing:-.4px}
+  .pr-main{display:flex; align-items:flex-end; justify-content:space-between; gap:12px}
+  .pr-head{min-width:0}
+  .pr-head span, .pr-aside span{display:block; font-size:12.5px; color:var(--muted); margin-bottom:3px}
+  .pr-head b{display:block; font-size:26px; font-weight:640; letter-spacing:-.4px}
+  .pr-aside{flex:none; text-align:right; padding-bottom:2px}
+  .pr-aside b{display:block; font-size:17px; font-weight:600; font-variant-numeric:tabular-nums}
+  .pr-aside b.neg{color:var(--danger)}
   .pr-main b.neg{color:var(--danger)}
   .pr-sub{font-size:12px; color:var(--faint); margin-top:5px; line-height:1.65}
   .pr-tip{font-size:12px; color:var(--accent); margin-top:6px; line-height:1.65}
@@ -118,6 +138,24 @@
   .res-summary b{color:var(--text); font-weight:600}
   .res-summary .neg{color:var(--danger); font-weight:600}
   .res-empty{text-align:center; color:var(--faint); font-size:12.5px; padding:16px 8px; line-height:1.7}
+  .res-toggle{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--muted)}
+  .res-toggle input{width:16px; height:16px; margin:0; accent-color:var(--accent); flex:none}
+  .res-income{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:-2px 0 6px; flex-wrap:wrap}
+  .res-income-box{display:flex; align-items:center; gap:2px; background:var(--bg); border-radius:11px; padding:6px 8px 6px 10px}
+  .res-income-box .cur{font-size:12.5px; color:var(--faint)}
+  .res-income-box input{width:56px; border:0; background:none; outline:none; font-size:14px; font-weight:560; color:var(--text);
+    font-variant-numeric:tabular-nums; padding:0}
+  .res-income-box .mini{margin-left:6px; padding:5px 8px; border-radius:8px; background:var(--card); font-size:11.5px}
+  .res-income-box .mini:disabled{opacity:.38}
+  .res-income-box.disabled{opacity:.45}
+  .res-hint{font-size:11.5px; color:var(--faint); line-height:1.6; margin-bottom:8px}
+  .res-hint:empty{display:none}
+
+  /* ---------- 同一天内排序 ---------- */
+  .order-row{display:flex; gap:8px; margin-top:12px}
+  .order-row[hidden]{display:none}
+  .order-btn{flex:1; padding:9px 0; border-radius:11px; background:var(--bg); font-size:13px; color:var(--muted)}
+  .order-btn:disabled{opacity:.38}
 
   /* ---------- category bars ---------- */
   .catrow{display:flex; align-items:center; gap:10px; padding:7px 0}
@@ -196,9 +234,15 @@
   .mrow .nm{flex:1; font-size:14.5px}
   .mrow .cnt{font-size:11.5px; color:var(--faint); margin-right:4px}
   .mini{padding:6px 10px; border-radius:9px; background:var(--bg); font-size:12.5px; color:var(--muted)}
-  .addrow{display:flex; gap:8px; margin-top:14px}
+  .mini:disabled{opacity:.4}
+  .bg-row{display:flex; align-items:center; gap:12px}
+  .bg-preview{width:104px; height:64px; border-radius:11px; flex:none; border:1px solid var(--line);
+    background:var(--bg) center/cover no-repeat}
+  .bg-actions{display:flex; gap:8px; flex-wrap:wrap}
+  .addrow{display:flex; gap:8px; margin-top:10px; align-items:center}
   .addrow input{flex:1; min-width:0; background:var(--bg); border:0; border-radius:12px; padding:11px 12px; font-size:15px; color:var(--text); outline:none}
-  .addrow .btn{height:auto; padding:0 16px; border-radius:12px; font-size:14px}
+  .addrow .mini{padding:11px 14px; border-radius:12px; flex:none}
+  .addrow .btn{height:47px; padding:0 16px; border-radius:12px; font-size:14px; flex:none}
   .emoji-pick{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px}
   .emoji-pick button{width:34px; height:34px; border-radius:10px; background:var(--bg); font-size:16px; border:1.5px solid transparent}
   .emoji-pick button.on{border-color:var(--accent); background:var(--accent-weak)}
@@ -260,6 +304,18 @@
     <h2>预留核销</h2>
     <button class="link" id="btnResAdd">＋ 新增</button>
   </div>
+  <div class="res-income">
+    <label class="res-toggle">
+      <input type="checkbox" id="resWithIncome" checked>
+      <span>把之后的到账也算进来</span>
+    </label>
+    <div class="res-income-box">
+      <span class="cur">¥</span>
+      <input id="resIncome" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+      <button class="mini" id="resIncomeReset">用实际</button>
+    </div>
+  </div>
+  <div class="res-hint" id="resIncomeHint"></div>
   <div id="resList"></div>
   <div class="res-summary" id="resSummary"></div>
 </section>
@@ -296,6 +352,10 @@
     <div class="fields">
       <label class="field"><span>日期</span><input id="expDate" type="date"></label>
       <label class="field"><span>备注（可选）</span><input id="expNote" type="text" maxlength="24" placeholder="例如 午饭"></label>
+    </div>
+    <div class="order-row" id="expOrderRow">
+      <button class="order-btn" id="expUp">↑ 上移</button>
+      <button class="order-btn" id="expDown">↓ 下移</button>
     </div>
     <div class="sheet-actions">
       <button class="btn danger" id="expDelete" style="flex:0 0 76px">删除</button>
@@ -371,9 +431,18 @@
     <div class="label">生活费到账日（每月几号，逗号分隔）</div>
     <div class="addrow">
       <input id="anchorInput" type="text" inputmode="numeric" placeholder="5,15,25">
-      <button class="btn ghost" id="btnSaveAnchor" style="border-radius:12px">保存</button>
+      <button class="mini" id="btnSaveAnchor">保存</button>
     </div>
     <div class="note">到账日把一个月切成几段，本页的「本期」就是最近一个到账日到现在。没花完的钱会自动滚到下一段。</div>
+    <div class="label">背景图</div>
+    <div class="bg-row">
+      <div class="bg-preview" id="bgPreview"></div>
+      <div class="bg-actions">
+        <button class="mini" id="btnBgPick">选图片</button>
+        <button class="mini" id="btnBgClear">恢复默认</button>
+      </div>
+    </div>
+    <div class="note">从手机相册选一张图，会自动压到 1600px 以内再存（不占太多空间），铺满整屏并盖一层蒙版保证字看得清。图只存在这台设备上，导出备份时会一起带走。</div>
     <div class="label">数据</div>
     <div class="mrow">
       <div class="nm">导出备份（JSON）</div>
@@ -389,6 +458,7 @@
     </div>
     <div class="note">数据只存在这台设备的浏览器里，不会上传。换手机前记得先导出。</div>
     <input type="file" id="fileInput" accept="application/json,.json" hidden>
+    <input type="file" id="bgInput" accept="image/*" hidden>
   </div>
 </div>
 
@@ -499,12 +569,6 @@ function projectSpending(sum, daily, target){
   };
 }
 
-// 一期平均多少天（3 个到账日 → 10 天）
-function periodGapDays(anchorDays){
-  var n = normalizeAnchors(anchorDays).length;
-  return Math.max(1, Math.round(30 / n));
-}
-
 // 某段时间里所有的到账日（升序）
 function anchorKeysBetween(anchorDays, fromKey, toKey){
   var anchors = normalizeAnchors(anchorDays);
@@ -551,19 +615,13 @@ function periodHistory(data, tk){
   return { periods: periods, avgSurplus: avg, count: periods.length };
 }
 
-// 从现在到 target 之前，还会经历几期（不足一期按 0 算，调用方自己兜底成 1）
-function periodsBefore(anchorDays, tk, target){
-  var d = diffDays(tk, target);
-  if (d <= 0) return 0;
-  return Math.floor(d / periodGapDays(anchorDays));
-}
-
 // 为了几笔预留，每期得从结余里匀出多少；匀完还剩多少能自由花
+// 期数 = 从现在到核销日之间，会到账几次（5/15/25 这样的日子），不足一次按一次算
 function budgetAfterReserve(avgSurplus, reserves, anchorDays, tk){
   var perPeriod = 0;
   var details = [];
   (reserves || []).forEach(function(r){
-    var n = Math.max(1, periodsBefore(anchorDays, tk, r.date));
+    var n = Math.max(1, futurePaydayCount(anchorDays, tk, r.date));
     var share = round2((Number(r.amount) || 0) / n);
     perPeriod += share;
     details.push({ id: r.id, periods: n, share: share });
@@ -576,22 +634,56 @@ function budgetAfterReserve(avgSurplus, reserves, anchorDays, tk){
   };
 }
 
+// 每期平均到账多少（用来预估未来的钱）
+function avgIncomePerPeriod(data){
+  var inc = (data.incomes || []);
+  if (!inc.length) return { avg: 0, count: 0 };
+  var total = inc.reduce(function(a, r){ return a + (Number(r.amount) || 0); }, 0);
+  return { avg: round2(total / inc.length), count: inc.length };
+}
+
+// 实际用的「每期到账」：用户填了就用填的，没填就用历史平均
+function resolveIncomePerPeriod(data, custom){
+  var real = avgIncomePerPeriod(data);
+  var n = Number(custom);
+  if (custom !== null && custom !== undefined && custom !== '' && isFinite(n) && n >= 0){
+    return { avg: round2(n), count: real.count, custom: true };
+  }
+  return { avg: real.avg, count: real.count, custom: false };
+}
+
+// 从现在到 target（含当天）之间还会到账几次
+function futurePaydayCount(anchorDays, tk, target){
+  if (target <= tk) return 0;
+  return anchorKeysBetween(anchorDays, addDays(tk, 1), target).length;
+}
+
 // 每笔预留：到那天手上还能有多少、够不够
 // 更早的预留会先占掉额度，所以按日期顺序累计
-function reserveChecks(sum, daily, reserves){
+// opts.withIncome 为真时，把 target 之前会到账的几期钱也算进来
+function reserveChecks(sum, daily, reserves, opts){
+  opts = opts || {};
+  var withIncome = !!opts.withIncome;
+  var perPeriodIncome = Number(opts.incomePerPeriod) || 0;
+  var anchors = normalizeAnchors(opts.anchorDays || [5, 15, 25]);
+
   var sorted = (reserves || []).slice().sort(function(a, b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
   var committed = 0;
   var out = [];
   sorted.forEach(function(r){
     var p = projectSpending(sum, daily, r.date);
-    var avail = round2(sum.remaining - p.spend - committed);
+    var paydays = withIncome ? futurePaydayCount(anchors, sum.today, r.date) : 0;
+    var incoming = round2(paydays * perPeriodIncome);
+    var avail = round2(sum.remaining + incoming - p.spend - committed);
+    var amount = Number(r.amount) || 0;
     out.push({
-      id: r.id, date: r.date, amount: Number(r.amount) || 0,
-      days: p.days, availableAtDate: avail,
-      covered: avail >= (Number(r.amount) || 0),
-      gap: round2(avail - (Number(r.amount) || 0))
+      id: r.id, date: r.date, amount: amount,
+      days: p.days, paydays: paydays, incoming: incoming,
+      availableAtDate: avail,
+      covered: avail >= amount,
+      gap: round2(avail - amount)
     });
-    committed += Number(r.amount) || 0;
+    committed += amount;
   });
   return out;
 }
@@ -612,7 +704,7 @@ function reserveChecks(sum, daily, reserves){
     var s = v.toLocaleString('zh-CN', { minimumFractionDigits:2, maximumFractionDigits:2 });
     return (n < 0 ? '-' : '') + s;
   }
-  function money(n){ return '¥' + fmt(n); }
+  function money(n){ return (n < 0 ? '-¥' : '¥') + fmt(Math.abs(round2(n))); }
   function md(k){ var d = parseKey(k); return (d.getMonth()+1) + '.' + pad2(d.getDate()); }
   function mdCn(k){ var d = parseKey(k); return (d.getMonth()+1) + '月' + d.getDate() + '日'; }
   function weekdayCn(k){ return '日一二三四五六'[parseKey(k).getDay()]; }
@@ -639,6 +731,9 @@ function reserveChecks(sum, daily, reserves){
       expenses: [],
       incomes: [],
       reservations: [],
+      reserveWithIncome: true,
+      reserveIncome: null,
+      background: null,
       plan: { daily: null, target: null, follow: true }
     };
   }
@@ -656,8 +751,24 @@ function reserveChecks(sum, daily, reserves){
       d.reservations = Array.isArray(d.reservations) ? d.reservations : [];
       if (!d.plan || typeof d.plan !== 'object') d.plan = { daily: null, target: null, follow: true };
       if (d.plan.follow === undefined) d.plan.follow = true;   // 老数据默认跟随到账日
+      if (d.reserveWithIncome === undefined) d.reserveWithIncome = true;
+      if (d.reserveIncome === undefined) d.reserveIncome = null;
+      if (typeof d.background !== 'string' || !d.background) d.background = null;
+      d = migrateSeq(d);
       return d;
     } catch (e) { return defaults(); }
+  }
+
+  // 老数据的支出没有 seq（同一天内的排序号），按原来的显示顺序（新的在上）整体补一遍
+  function migrateSeq(d){
+    var missing = d.expenses.some(function(e){ return typeof e.seq !== 'number'; });
+    if (!missing) return d;
+    var list = d.expenses.slice().sort(function(a, b){
+      var ka = String(a.ts || a.date), kb = String(b.ts || b.date);
+      return ka < kb ? 1 : (ka > kb ? -1 : 0);   // ts 倒序：最新的排最前
+    });
+    list.forEach(function(e, i){ e.seq = i + 1; });   // 同一个对象引用，改的就是 d.expenses 里的
+    return d;
   }
 
   var state = load();
@@ -666,9 +777,93 @@ function reserveChecks(sum, daily, reserves){
   var pickedEmoji = '🍜';
 
   function save(){
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
-    catch (e) { toast('保存失败，可能是浏览器存储被占满'); }
+    try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
+    catch (e) { toast('保存失败，可能是浏览器存储被占满'); return false; }
   }
+
+  /* ---------------- 背景图 ---------------- */
+  function applyBackground(){
+    var bg = state.background;
+    var prev = $('#bgPreview');
+    if (bg){
+      document.documentElement.style.setProperty('--bg-img', 'url("' + bg + '")');
+      document.body.classList.add('has-bg');
+    } else {
+      document.documentElement.style.removeProperty('--bg-img');
+      document.body.classList.remove('has-bg');
+    }
+    if (prev) prev.style.backgroundImage = bg ? 'url("' + bg + '")' : 'none';
+  }
+
+  // 压到 maxSide 以内再转 base64，避免一张照片把 localStorage 撑爆
+  function compressImage(file, maxSide, quality){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        try {
+          var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+          var scale = Math.min(1, maxSide / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, cw, ch);
+          var data = canvas.toDataURL('image/jpeg', quality);
+          URL.revokeObjectURL(url);
+          resolve(data);
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          reject(e);
+        }
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  function setBackground(dataUrl){
+    var old = state.background;
+    state.background = dataUrl;
+    if (!save()){
+      state.background = old;
+      toast('这张图太大，存不下，换一张小点的');
+      return false;
+    }
+    applyBackground();
+    return true;
+  }
+
+  $('#btnBgPick').addEventListener('click', function(){ $('#bgInput').click(); });
+
+  $('#bgInput').addEventListener('change', function(){
+    var input = this;
+    var f = input.files && input.files[0];
+    input.value = '';
+    if (!f) return;
+    toast('正在处理图片…');
+    compressImage(f, 1600, 0.82)
+      .then(function(data){
+        if (data.length > 2600000){          // 太大就再压一档
+          return compressImage(f, 1200, 0.68);
+        }
+        return data;
+      })
+      .then(function(data){
+        if (setBackground(data)) toast('背景已换好');
+      })
+      .catch(function(){ toast('这张图处理不了，换一张试试'); });
+  });
+
+  $('#btnBgClear').addEventListener('click', function(){
+    if (!state.background){ toast('现在就是默认背景'); return; }
+    if (!confirm('恢复默认背景？')) return;
+    state.background = null;
+    save();
+    applyBackground();
+    toast('已恢复默认背景');
+  });
 
   function catOf(id){
     for (var i=0;i<state.categories.length;i++) if (state.categories[i].id === id) return state.categories[i];
@@ -752,9 +947,35 @@ function reserveChecks(sum, daily, reserves){
     state.incomes.forEach(function(i){ list.push(Object.assign({ type:'income' }, i)); });
     list.sort(function(a,b){
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      if (a.type !== b.type) return a.type === 'expense' ? -1 : 1;   // 同一天：支出在前
+      if (a.type === 'expense') return seqOf(a) - seqOf(b);            // 支出按手动排序
       return String(b.ts || '').localeCompare(String(a.ts || ''));
     });
     return list;
+  }
+
+  function seqOf(x){ return typeof x.seq === 'number' ? x.seq : 0; }
+
+  function dayExpenses(date){
+    return state.expenses.filter(function(e){ return e.date === date; })
+      .sort(function(a, b){ return seqOf(a) - seqOf(b); });
+  }
+
+  // 同一天内上移 / 下移一笔支出
+  function moveExpense(id, dir){
+    var target = state.expenses.filter(function(e){ return e.id === id; })[0];
+    if (!target) return false;
+    var list = dayExpenses(target.date);
+    var i = list.map(function(e){ return e.id; }).indexOf(id);
+    var j = i + dir;
+    if (i < 0 || j < 0 || j >= list.length) return false;
+    var arr = list.slice();
+    var moved = arr.splice(i, 1)[0];
+    arr.splice(j, 0, moved);
+    arr.forEach(function(e, k){ e.seq = k + 1; });   // 整组重排，避免 seq 撞车
+    save();
+    render();
+    return true;
   }
 
   function renderFlow(){
@@ -855,9 +1076,18 @@ function reserveChecks(sum, daily, reserves){
     var when = follow ? mdCn(target) + '（到账前一天）' : mdCn(target);
     var html = '';
 
+    // 每期可自由花 = 平均每期结余 − 每期要为预留攒的钱（放在「预计还剩」右边）
+    var hist = periodHistory(state, s.today);
+    var budget = budgetAfterReserve(hist.avgSurplus, pendingRes(), state.anchorDays, s.today);
+    var freeTxt = budget.freePerPeriod === null ? '—' : money(budget.freePerPeriod);
+    var freeCls = (budget.freePerPeriod !== null && budget.freePerPeriod < 0) ? ' neg' : '';
+    var aside = '<div class="pr-aside"><span>每期可自由花</span><b class="num' + freeCls + '">' + freeTxt + '</b></div>';
+
     if (p.left >= 0) {
-      html += '<div class="pr-main"><span>撑到 ' + when + ' 预计还剩</span>' +
-              '<b class="num">' + money(p.left) + '</b></div>';
+      html += '<div class="pr-main">' +
+                '<div class="pr-head"><span>撑到 ' + when + ' 预计还剩</span>' +
+                '<b class="num">' + money(p.left) + '</b></div>' + aside +
+              '</div>';
       html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
               '，从现在的 ' + money(s.remaining) + ' 里扣</div>';
       if (p.days === 0) {
@@ -868,8 +1098,10 @@ function reserveChecks(sum, daily, reserves){
         html += '<div class="pr-tip">撑得到那天；想刚好用完，每天最多花 ' + money(p.maxDaily) + '</div>';
       }
     } else {
-      html += '<div class="pr-main"><span>撑到 ' + when + ' 预计差</span>' +
-              '<b class="num neg">' + money(-p.left) + '</b></div>';
+      html += '<div class="pr-main">' +
+                '<div class="pr-head"><span>撑到 ' + when + ' 预计差</span>' +
+                '<b class="num neg">' + money(-p.left) + '</b></div>' + aside +
+              '</div>';
       html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
               '，超过现在的 ' + money(s.remaining) + '</div>';
       if (p.maxDaily === null || p.maxDaily <= 0) {
@@ -927,12 +1159,41 @@ function reserveChecks(sum, daily, reserves){
   function resChecks(s){
     var daily = planDailyValue();
     if (daily === null) daily = actualDaily(s);
-    return reserveChecks(s, daily === null ? 0 : daily, pendingRes());
+    var inc = resolveIncomePerPeriod(state, state.reserveIncome);
+    return reserveChecks(s, daily === null ? 0 : daily, pendingRes(), {
+      withIncome: state.reserveWithIncome !== false,
+      incomePerPeriod: inc.avg,
+      anchorDays: state.anchorDays
+    });
   }
 
   function renderRes(s){
     var el = $('#resList');
     var sumEl = $('#resSummary');
+    var toggleEl = $('#resWithIncome');
+    var incomeEl = $('#resIncome');
+    var resetEl = $('#resIncomeReset');
+    var hintEl = $('#resIncomeHint');
+
+    var withIncome = state.reserveWithIncome !== false;
+    if (toggleEl.checked !== withIncome) toggleEl.checked = withIncome;
+
+    var inc = resolveIncomePerPeriod(state, state.reserveIncome);
+    var real = avgIncomePerPeriod(state);
+    var want = inc.avg ? String(inc.avg) : '';
+    if (incomeEl.value !== want && document.activeElement !== incomeEl) incomeEl.value = want;
+    incomeEl.disabled = !withIncome;
+    resetEl.disabled = !withIncome || !inc.custom;
+    incomeEl.parentNode.classList.toggle('disabled', !withIncome);
+
+    hintEl.textContent = !withIncome
+      ? '不勾的话只看手上现有的钱，不算后面会到账的。'
+      : inc.custom
+        ? '按你填的每期 ' + money(inc.avg) + ' 算（历史平均 ' + money(real.avg) + '）'
+        : (real.count
+            ? '按历史到账平均 ' + money(inc.avg) + '（' + real.count + ' 笔），可以直接改成你预估的数'
+            : '还没有到账记录，先填一个你估计的每期生活费');
+
     var all = (state.reservations || []).slice().sort(function(a, b){
       if (!!a.done !== !!b.done) return a.done ? 1 : -1;
       return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
@@ -960,12 +1221,15 @@ function reserveChecks(sum, daily, reserves){
         else if (c) badge = c.covered
           ? '<span class="badge ok">够</span>'
           : '<span class="badge warn">差 ' + money(-c.gap) + '</span>';
+        var extra = (c && c.paydays > 0)
+          ? ' · 含 ' + c.paydays + ' 次到账 ' + money(c.incoming)
+          : '';
         var name = r.note ? esc(r.note) : cat.name;
         return '<div class="res-item' + (r.done ? ' done' : '') + '" data-res="' + r.id + '">' +
           '<div class="res-main">' +
             '<div class="res-line"><span class="nm">' + name + '</span>' +
               '<span class="amt num">' + money(r.amount) + '</span></div>' +
-            '<div class="res-meta"><span>' + mdCn(r.date) + ' · ' + esc(cat.name) + '</span>' + badge + '</div>' +
+            '<div class="res-meta"><span>' + mdCn(r.date) + ' · ' + esc(cat.name) + extra + '</span>' + badge + '</div>' +
           '</div></div>';
       }).join('');
       el.innerHTML = html;
@@ -984,13 +1248,10 @@ function reserveChecks(sum, daily, reserves){
         lines.push('要给 ' + pend.length + ' 笔预留每期攒 <b>' + money(budget.perPeriodReserve) + '</b>' +
           '（分别摊 ' + budget.details.map(function(d){ return d.periods; }).join('、') + ' 期）');
         if (budget.freePerPeriod < 0){
-          lines.push('每期能自由花 <span class="neg">' + money(budget.freePerPeriod) +
-            '</span>，光靠结余攒不够，要动之前的存款');
-        } else {
-          lines.push('每期还能自由花 <b>' + money(budget.freePerPeriod) + '</b>');
+          lines.push('所以每期可自由花是负数，光靠结余攒不够，要动之前的存款');
         }
       } else {
-        lines.push('没有预留时，每期可以自由花 <b>' + money(hist.avgSurplus) + '</b>');
+        lines.push('没有预留，每期结余都能自由支配');
       }
     }
     sumEl.innerHTML = lines.join('<br>');
@@ -1026,7 +1287,7 @@ function reserveChecks(sum, daily, reserves){
     var exp = {
       id: uid(), amount: r.amount, date: d,
       categoryId: r.categoryId || (state.categories[0] && state.categories[0].id),
-      note: r.note || '核销', ts: new Date().toISOString()
+      note: r.note || '核销', seq: firstSeqOfDay(d), ts: new Date().toISOString()
     };
     state.expenses.push(exp);
     r.done = true;
@@ -1037,6 +1298,30 @@ function reserveChecks(sum, daily, reserves){
   }
 
   $('#btnResAdd').addEventListener('click', function(){ openRes(null); });
+
+  $('#resWithIncome').addEventListener('change', function(){
+    state.reserveWithIncome = this.checked;
+    save();
+    renderRes(computeSummary(state, dateKeyOf(new Date())));
+  });
+
+  $('#resIncome').addEventListener('input', function(){
+    var raw = this.value.replace(',', '.').trim();
+    if (raw === '') state.reserveIncome = null;
+    else {
+      var n = Number(raw);
+      state.reserveIncome = isFinite(n) && n >= 0 ? round2(n) : null;
+    }
+    save();
+    renderRes(computeSummary(state, dateKeyOf(new Date())));
+  });
+
+  $('#resIncomeReset').addEventListener('click', function(){
+    state.reserveIncome = null;
+    save();
+    renderRes(computeSummary(state, dateKeyOf(new Date())));
+    toast('已改回历史平均到账');
+  });
 
   $('#resCats').addEventListener('click', function(e){
     var b = e.target.closest('[data-cat]');
@@ -1122,9 +1407,42 @@ function reserveChecks(sum, daily, reserves){
     pickedCat = item ? item.categoryId : (state.categories[0] && state.categories[0].id);
     renderExpCats();
     $('#expDelete').style.display = item ? '' : 'none';
+    updateOrderButtons(item);
     openSheet('#sheetExpense');
     setTimeout(function(){ if (!item) $('#expAmount').focus(); }, 260);
   }
+
+  // 同一天内的排序按钮：第一笔不能上移，最后一笔不能下移
+  function updateOrderButtons(item){
+    var row = $('#expOrderRow');
+    if (!item){
+      row.hidden = true;
+      return;
+    }
+    var list = dayExpenses(item.date);
+    var i = list.map(function(e){ return e.id; }).indexOf(item.id);
+    row.hidden = list.length < 2;
+    $('#expUp').disabled = i <= 0;
+    $('#expDown').disabled = i < 0 || i >= list.length - 1;
+  }
+
+  $('#expUp').addEventListener('click', function(){
+    if (!editing.expense) return;
+    if (moveExpense(editing.expense, -1)){
+      var item = state.expenses.filter(function(e){ return e.id === editing.expense; })[0];
+      updateOrderButtons(item);
+      toast('已上移');
+    }
+  });
+
+  $('#expDown').addEventListener('click', function(){
+    if (!editing.expense) return;
+    if (moveExpense(editing.expense, 1)){
+      var item = state.expenses.filter(function(e){ return e.id === editing.expense; })[0];
+      updateOrderButtons(item);
+      toast('已下移');
+    }
+  });
 
   $('#btnExpense').addEventListener('click', function(){ openExpense(null); });
 
@@ -1138,13 +1456,29 @@ function reserveChecks(sum, daily, reserves){
 
     if (editing.expense){
       state.expenses.forEach(function(e){
-        if (e.id === editing.expense) { e.amount = amt; e.date = date; e.note = note; e.categoryId = pickedCat; }
+        if (e.id === editing.expense){
+          if (e.date !== date){   // 换了日期就放到那天的第一条
+            e.seq = firstSeqOfDay(date);
+          }
+          e.amount = amt; e.date = date; e.note = note; e.categoryId = pickedCat;
+        }
       });
     } else {
-      state.expenses.push({ id: uid(), amount: amt, date: date, categoryId: pickedCat, note: note, ts: new Date().toISOString() });
+      state.expenses.push({
+        id: uid(), amount: amt, date: date, categoryId: pickedCat, note: note,
+        seq: firstSeqOfDay(date), ts: new Date().toISOString()
+      });
     }
     save(); render(); closeSheets(); toast('已记下');
   });
+
+  // 新记的一笔排在当天最前面
+  function firstSeqOfDay(date){
+    var list = state.expenses.filter(function(e){ return e.date === date; });
+    if (!list.length) return 1;
+    var min = Math.min.apply(null, list.map(seqOf));
+    return min - 1;
+  }
 
   $('#expDelete').addEventListener('click', function(){
     if (!editing.expense) return;
@@ -1328,7 +1662,15 @@ function reserveChecks(sum, daily, reserves){
         state = d;
         state.anchorDays = normalizeAnchors(state.anchorDays);
         state.categories = Array.isArray(state.categories) && state.categories.length ? state.categories : defaults().categories;
-        save(); render(); closeSheets(); toast('导入成功');
+        if (typeof state.background !== 'string') state.background = null;
+        if (!state.plan || typeof state.plan !== 'object') state.plan = { daily: null, target: null, follow: true };
+        if (typeof state.reserveWithIncome !== 'boolean') state.reserveWithIncome = true;
+        if (state.reserveIncome === undefined) state.reserveIncome = null;
+        state.expenses = Array.isArray(state.expenses) ? state.expenses : [];
+        state.incomes = Array.isArray(state.incomes) ? state.incomes : [];
+        state.reservations = Array.isArray(state.reservations) ? state.reservations : [];
+        migrateSeq(state);
+        save(); applyBackground(); render(); closeSheets(); toast('导入成功');
       } catch (err) { toast('文件格式不对'); }
     };
     reader.readAsText(f);
@@ -1342,8 +1684,11 @@ function reserveChecks(sum, daily, reserves){
   });
 
   /* -------- boot -------- */
+  applyBackground();
   render();
-  window.addEventListener('storage', function(e){ if (e.key === KEY) { state = load(); render(); } });
+  window.addEventListener('storage', function(e){
+    if (e.key === KEY) { state = load(); applyBackground(); render(); }
+  });
 })();
 </script>
 
