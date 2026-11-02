@@ -565,10 +565,10 @@ function computeSummary(data, tk){
 }
 
 // 按某个日均消费，预测「撑到某天」还剩多少钱
-// target 是「最后一分钱要撑到的那天」，包含当天（今天到 target 一共 days 天）
+// 剩余天数不含今天：今天已经花掉的已经记在余额里了，再算一次会重复扣
 function projectSpending(sum, daily, target){
   var d = Math.max(0, Number(daily) || 0);
-  var days = target < sum.today ? 0 : diffDays(sum.today, target) + 1;
+  var days = Math.max(0, diffDays(sum.today, target));   // 不含今天
   var spend = round2(d * days);
   var left = round2(sum.remaining - spend);
   var surviveDays = d > 0 ? Math.floor(Math.max(0, sum.remaining) / d) : Infinity;
@@ -1118,7 +1118,9 @@ function reserveChecks(sum, daily, reserves, opts){
       html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
               '，从现在的 ' + money(s.remaining) + ' 里扣</div>';
       if (p.days === 0) {
-        html += '<div class="pr-tip">选的是已经过去的日子，没有可预测的天数。</div>';
+        html += '<div class="pr-tip">' + (target < s.today
+          ? '选的是已经过去的日子，没有可预测的天数。'
+          : '选的就是今天，剩余就是现在的余额。') + '</div>';
       } else if (p.daily === 0) {
         html += '<div class="pr-tip">日均填 0，就是一分不花，钱能一直撑到那天。</div>';
       } else {
