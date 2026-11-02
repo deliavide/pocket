@@ -87,14 +87,37 @@
   .plan-date{border:0; background:var(--bg); border-radius:11px; padding:9px 11px; font-size:14px; color:var(--text);
     outline:none; -webkit-appearance:none; appearance:none; font-family:inherit; font-variant-numeric:tabular-nums;
     flex:1; min-width:0; width:100%}
+  .plan-date:disabled{opacity:1; color:var(--text); -webkit-text-fill-color:var(--text); background:var(--bg)}
+  .plan-follow{display:flex; align-items:center; gap:8px; margin-top:11px; font-size:12.5px; color:var(--muted)}
+  .plan-follow input{width:16px; height:16px; margin:0; accent-color:var(--accent); flex:none}
   .plan-result{margin-top:14px; padding-top:14px; border-top:1px solid var(--line)}
-  .pr-main{display:flex; align-items:baseline; gap:8px}
-  .pr-main span{font-size:12.5px; color:var(--muted)}
-  .pr-main b{font-size:26px; font-weight:640; letter-spacing:-.4px}
+  .pr-main span{display:block; font-size:12.5px; color:var(--muted); margin-bottom:3px}
+  .pr-main b{display:block; font-size:26px; font-weight:640; letter-spacing:-.4px}
   .pr-main b.neg{color:var(--danger)}
   .pr-sub{font-size:12px; color:var(--faint); margin-top:5px; line-height:1.65}
   .pr-tip{font-size:12px; color:var(--accent); margin-top:6px; line-height:1.65}
   .pr-tip.warn{color:var(--danger)}
+
+  /* ---------- 预留核销 ---------- */
+  .res-alert{background:rgba(217,45,75,.10); color:var(--danger); font-size:12px; padding:9px 11px;
+    border-radius:11px; margin-bottom:10px; line-height:1.55}
+  .res-item{display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line)}
+  .res-item:last-child{border-bottom:0}
+  .res-main{flex:1; min-width:0}
+  .res-line{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
+  .res-line .nm{font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .res-line .amt{font-size:14.5px; font-weight:560; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .res-meta{font-size:11.5px; color:var(--faint); margin-top:4px; display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+  .badge{font-size:11px; padding:1px 7px; border-radius:99px; background:var(--bg); color:var(--muted); white-space:nowrap}
+  .badge.warn{background:rgba(217,45,75,.12); color:var(--danger)}
+  .badge.ok{background:var(--accent-weak); color:var(--accent)}
+  .res-item.done .res-line .nm{color:var(--faint); text-decoration:line-through}
+  .res-item.done .res-line .amt{color:var(--faint); font-weight:400}
+  .res-summary{margin-top:12px; padding-top:12px; border-top:1px solid var(--line); font-size:12px;
+    color:var(--muted); line-height:1.8}
+  .res-summary b{color:var(--text); font-weight:600}
+  .res-summary .neg{color:var(--danger); font-weight:600}
+  .res-empty{text-align:center; color:var(--faint); font-size:12.5px; padding:16px 8px; line-height:1.7}
 
   /* ---------- category bars ---------- */
   .catrow{display:flex; align-items:center; gap:10px; padding:7px 0}
@@ -225,7 +248,20 @@
     <span class="plan-label">想撑到</span>
     <input id="planDate" type="date" class="plan-date">
   </div>
+  <label class="plan-follow">
+    <input type="checkbox" id="planFollow" checked>
+    <span>跟随到账日（自动取到账前一天）</span>
+  </label>
   <div class="plan-result" id="planResult"></div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h2>预留核销</h2>
+    <button class="link" id="btnResAdd">＋ 新增</button>
+  </div>
+  <div id="resList"></div>
+  <div class="res-summary" id="resSummary"></div>
 </section>
 
 <section class="card">
@@ -283,6 +319,28 @@
     <div class="sheet-actions">
       <button class="btn danger" id="incDelete" style="flex:0 0 76px">删除</button>
       <button class="btn primary block" id="incSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 预留核销 ===== -->
+<div class="sheet" id="sheetRes">
+  <div class="backdrop" data-close></div>
+  <div class="panel">
+    <div class="grab"></div>
+    <div class="sheet-head"><h2 id="resTitle">新增预留</h2><button class="x" data-close>✕</button></div>
+    <div class="amount-field"><span class="cur">¥</span><input id="resAmount" type="text" inputmode="decimal" placeholder="¥ 0.00" autocomplete="off"></div>
+    <div class="label">到时候算哪一类支出</div>
+    <div class="chips" id="resCats"></div>
+    <div class="fields">
+      <label class="field"><span>核销日期</span><input id="resDate" type="date"></label>
+      <label class="field"><span>说明（可选）</span><input id="resNote" type="text" maxlength="16" placeholder="例如 双十一"></label>
+    </div>
+    <div class="note" id="resTip"></div>
+    <div class="sheet-actions">
+      <button class="btn danger" id="resDelete" style="flex:0 0 76px">删除</button>
+      <button class="btn ghost" id="resRedeem" style="flex:0 0 96px">已核销</button>
+      <button class="btn primary block" id="resSave">保存</button>
     </div>
   </div>
 </div>
@@ -427,9 +485,10 @@ function computeSummary(data, tk){
 }
 
 // 按某个日均消费，预测「撑到某天」还剩多少钱
+// target 是「最后一分钱要撑到的那天」，包含当天（今天到 target 一共 days 天）
 function projectSpending(sum, daily, target){
   var d = Math.max(0, Number(daily) || 0);
-  var days = Math.max(0, diffDays(sum.today, target));
+  var days = target < sum.today ? 0 : diffDays(sum.today, target) + 1;
   var spend = round2(d * days);
   var left = round2(sum.remaining - spend);
   var surviveDays = d > 0 ? Math.floor(Math.max(0, sum.remaining) / d) : Infinity;
@@ -438,6 +497,103 @@ function projectSpending(sum, daily, target){
     days: days, daily: d, spend: spend, left: left,
     covers: left >= 0, surviveDays: surviveDays, maxDaily: maxDaily
   };
+}
+
+// 一期平均多少天（3 个到账日 → 10 天）
+function periodGapDays(anchorDays){
+  var n = normalizeAnchors(anchorDays).length;
+  return Math.max(1, Math.round(30 / n));
+}
+
+// 某段时间里所有的到账日（升序）
+function anchorKeysBetween(anchorDays, fromKey, toKey){
+  var anchors = normalizeAnchors(anchorDays);
+  var from = parseKey(fromKey), to = parseKey(toKey);
+  var out = [];
+  var y = from.getFullYear(), m = from.getMonth();
+  for (var guard = 0; guard < 240; guard++){
+    anchorsOfMonth(y, m, anchors).forEach(function(k){
+      if (k >= fromKey && k <= toKey) out.push(k);
+    });
+    if (y > to.getFullYear() || (y === to.getFullYear() && m >= to.getMonth())) break;
+    m++; if (m > 11) { m = 0; y++; }
+  }
+  return out.sort();
+}
+
+// 已经结束的每一期，各自到账 / 支出 / 结余
+function periodHistory(data, tk){
+  var anchors = normalizeAnchors(data.anchorDays);
+  var recs = [];
+  (data.incomes  || []).forEach(function(r){ recs.push({ date:r.date, amount:Number(r.amount)||0, kind:'in'  }); });
+  (data.expenses || []).forEach(function(r){ recs.push({ date:r.date, amount:Number(r.amount)||0, kind:'out' }); });
+  if (!recs.length) return { periods: [], avgSurplus: null, count: 0 };
+
+  var first = recs.reduce(function(a, r){ return r.date < a ? r.date : a; }, recs[0].date);
+  var startKey = periodOf(first, anchors).start;
+  var keys = anchorKeysBetween(anchors, startKey, tk);
+
+  var periods = [];
+  for (var i = 0; i < keys.length - 1; i++){
+    var s = keys[i], e = keys[i+1];
+    if (e > tk) break;                  // 还没结束的这期不算
+    var inc = 0, exp = 0;
+    recs.forEach(function(r){
+      if (r.date >= s && r.date < e) { if (r.kind === 'in') inc += r.amount; else exp += r.amount; }
+    });
+    if (inc <= 0) continue;             // 没记到账的期（多半是刚开始用）会误导平均值
+    periods.push({ start:s, end:e, income:round2(inc), expense:round2(exp), surplus:round2(inc - exp) });
+  }
+
+  var avg = periods.length
+    ? round2(periods.reduce(function(a, p){ return a + p.surplus; }, 0) / periods.length)
+    : null;
+  return { periods: periods, avgSurplus: avg, count: periods.length };
+}
+
+// 从现在到 target 之前，还会经历几期（不足一期按 0 算，调用方自己兜底成 1）
+function periodsBefore(anchorDays, tk, target){
+  var d = diffDays(tk, target);
+  if (d <= 0) return 0;
+  return Math.floor(d / periodGapDays(anchorDays));
+}
+
+// 为了几笔预留，每期得从结余里匀出多少；匀完还剩多少能自由花
+function budgetAfterReserve(avgSurplus, reserves, anchorDays, tk){
+  var perPeriod = 0;
+  var details = [];
+  (reserves || []).forEach(function(r){
+    var n = Math.max(1, periodsBefore(anchorDays, tk, r.date));
+    var share = round2((Number(r.amount) || 0) / n);
+    perPeriod += share;
+    details.push({ id: r.id, periods: n, share: share });
+  });
+  perPeriod = round2(perPeriod);
+  return {
+    perPeriodReserve: perPeriod,
+    freePerPeriod: avgSurplus == null ? null : round2(avgSurplus - perPeriod),
+    details: details
+  };
+}
+
+// 每笔预留：到那天手上还能有多少、够不够
+// 更早的预留会先占掉额度，所以按日期顺序累计
+function reserveChecks(sum, daily, reserves){
+  var sorted = (reserves || []).slice().sort(function(a, b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  var committed = 0;
+  var out = [];
+  sorted.forEach(function(r){
+    var p = projectSpending(sum, daily, r.date);
+    var avail = round2(sum.remaining - p.spend - committed);
+    out.push({
+      id: r.id, date: r.date, amount: Number(r.amount) || 0,
+      days: p.days, availableAtDate: avail,
+      covered: avail >= (Number(r.amount) || 0),
+      gap: round2(avail - (Number(r.amount) || 0))
+    });
+    committed += Number(r.amount) || 0;
+  });
+  return out;
 }
 /* ==== LOGIC:END ==== */
 </script>
@@ -482,7 +638,8 @@ function projectSpending(sum, daily, target){
       ],
       expenses: [],
       incomes: [],
-      plan: { daily: null, target: null }
+      reservations: [],
+      plan: { daily: null, target: null, follow: true }
     };
   }
 
@@ -496,7 +653,9 @@ function projectSpending(sum, daily, target){
       d.categories = Array.isArray(d.categories) && d.categories.length ? d.categories : defaults().categories;
       d.expenses = Array.isArray(d.expenses) ? d.expenses : [];
       d.incomes  = Array.isArray(d.incomes)  ? d.incomes  : [];
-      if (!d.plan || typeof d.plan !== 'object') d.plan = { daily: null, target: null };
+      d.reservations = Array.isArray(d.reservations) ? d.reservations : [];
+      if (!d.plan || typeof d.plan !== 'object') d.plan = { daily: null, target: null, follow: true };
+      if (d.plan.follow === undefined) d.plan.follow = true;   // 老数据默认跟随到账日
       return d;
     } catch (e) { return defaults(); }
   }
@@ -556,6 +715,7 @@ function projectSpending(sum, daily, target){
     renderCats(s);
     renderFlow();
     renderPlan(s);
+    renderRes(s);
   }
 
   function renderCats(s){
@@ -659,18 +819,24 @@ function projectSpending(sum, daily, target){
   }
 
   function planTargetValue(s){
+    // 跟随到账日：撑到「到账日的前一天」，因为到账当天就有新钱了
+    if (state.plan.follow !== false) return addDays(s.next, -1);
     var t = state.plan && state.plan.target;
-    if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(t) || t < s.today) t = s.next;
+    if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(t) || t < s.today) t = addDays(s.next, -1);
     return t;
   }
 
   function renderPlan(s){
+    var follow = state.plan.follow !== false;
     var target = planTargetValue(s);
-    if (state.plan.target !== target) { state.plan.target = target; save(); }
 
     var dateEl = $('#planDate');
+    dateEl.disabled = follow;
     if (dateEl.value !== target) dateEl.value = target;
     dateEl.min = s.today;
+
+    var followEl = $('#planFollow');
+    if (followEl.checked !== follow) followEl.checked = follow;
 
     var daily = planDailyValue();
     if (daily === null) daily = actualDaily(s);   // 没填过就先按实际日均显示（不写进存档）
@@ -686,22 +852,23 @@ function projectSpending(sum, daily, target){
     }
 
     var p = projectSpending(s, daily, target);
+    var when = follow ? mdCn(target) + '（到账前一天）' : mdCn(target);
     var html = '';
 
     if (p.left >= 0) {
-      html += '<div class="pr-main"><span>到 ' + mdCn(target) + ' 预计还剩</span>' +
+      html += '<div class="pr-main"><span>撑到 ' + when + ' 预计还剩</span>' +
               '<b class="num">' + money(p.left) + '</b></div>';
       html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
               '，从现在的 ' + money(s.remaining) + ' 里扣</div>';
       if (p.days === 0) {
-        html += '<div class="pr-tip">选的是今天，没有可预测的天数。</div>';
+        html += '<div class="pr-tip">选的是已经过去的日子，没有可预测的天数。</div>';
       } else if (p.daily === 0) {
         html += '<div class="pr-tip">日均填 0，就是一分不花，钱能一直撑到那天。</div>';
       } else {
         html += '<div class="pr-tip">撑得到那天；想刚好用完，每天最多花 ' + money(p.maxDaily) + '</div>';
       }
     } else {
-      html += '<div class="pr-main"><span>到 ' + mdCn(target) + ' 预计差</span>' +
+      html += '<div class="pr-main"><span>撑到 ' + when + ' 预计差</span>' +
               '<b class="num neg">' + money(-p.left) + '</b></div>';
       html += '<div class="pr-sub">' + p.days + ' 天 × ¥' + fmt(p.daily) + ' = ' + money(p.spend) +
               '，超过现在的 ' + money(s.remaining) + '</div>';
@@ -710,7 +877,7 @@ function projectSpending(sum, daily, target){
       } else {
         html += '<div class="pr-tip warn">按这个花法，钱会在 ' +
                 mdCn(addDays(s.today, Math.max(0, p.surviveDays))) +
-                ' 左右见底；想撑到 ' + mdCn(target) + '，每天不能超过 ' + money(p.maxDaily) + '</div>';
+                ' 左右见底；想撑到那天，每天不能超过 ' + money(p.maxDaily) + '</div>';
       }
     }
     el.innerHTML = html;
@@ -729,6 +896,13 @@ function projectSpending(sum, daily, target){
 
   $('#planDate').addEventListener('change', function(){
     state.plan.target = this.value || null;
+    state.plan.follow = false;
+    save();
+    renderPlan(computeSummary(state, dateKeyOf(new Date())));
+  });
+
+  $('#planFollow').addEventListener('change', function(){
+    state.plan.follow = this.checked;
     save();
     renderPlan(computeSummary(state, dateKeyOf(new Date())));
   });
@@ -740,6 +914,174 @@ function projectSpending(sum, daily, target){
     save();
     renderPlan(s);
     toast(d === null ? '本期还没支出，先记两笔' : '已按实际日均 ¥' + fmt(d) + ' 算');
+  });
+
+  /* ---------------- 预留核销 ---------------- */
+  var resEditing = null;
+  var resCat = null;
+
+  function pendingRes(){
+    return (state.reservations || []).filter(function(r){ return !r.done; });
+  }
+
+  function resChecks(s){
+    var daily = planDailyValue();
+    if (daily === null) daily = actualDaily(s);
+    return reserveChecks(s, daily === null ? 0 : daily, pendingRes());
+  }
+
+  function renderRes(s){
+    var el = $('#resList');
+    var sumEl = $('#resSummary');
+    var all = (state.reservations || []).slice().sort(function(a, b){
+      if (!!a.done !== !!b.done) return a.done ? 1 : -1;
+      return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0);
+    });
+
+    if (!all.length){
+      el.innerHTML = '<div class="res-empty">还没有预留。比如「11月11日 · 双十一 · ¥800」，我提前帮你盯着到时候够不够。</div>';
+    } else {
+      var checks = resChecks(s);
+      var byId = {};
+      checks.forEach(function(c){ byId[c.id] = c; });
+      var alerts = checks.filter(function(c){ return !c.covered; });
+
+      var html = '';
+      if (alerts.length){
+        var worst = alerts[0];
+        html += '<div class="res-alert">⚠ ' + alerts.length + ' 笔预留撑不住：' + mdCn(worst.date) +
+                ' 那笔还差 ' + money(-worst.gap) + '</div>';
+      }
+      html += all.map(function(r){
+        var c = byId[r.id];
+        var cat = catOf(r.categoryId);
+        var badge = '';
+        if (r.done) badge = '<span class="badge">已核销</span>';
+        else if (c) badge = c.covered
+          ? '<span class="badge ok">够</span>'
+          : '<span class="badge warn">差 ' + money(-c.gap) + '</span>';
+        var name = r.note ? esc(r.note) : cat.name;
+        return '<div class="res-item' + (r.done ? ' done' : '') + '" data-res="' + r.id + '">' +
+          '<div class="res-main">' +
+            '<div class="res-line"><span class="nm">' + name + '</span>' +
+              '<span class="amt num">' + money(r.amount) + '</span></div>' +
+            '<div class="res-meta"><span>' + mdCn(r.date) + ' · ' + esc(cat.name) + '</span>' + badge + '</div>' +
+          '</div></div>';
+      }).join('');
+      el.innerHTML = html;
+    }
+
+    // 每期还能自由花多少：平均每期结余 - 每期要为预留攒的钱
+    var hist = periodHistory(state, s.today);
+    var pend = pendingRes();
+    var budget = budgetAfterReserve(hist.avgSurplus, pend, state.anchorDays, s.today);
+    var lines = [];
+    if (hist.avgSurplus === null){
+      lines.push('还没有完整账期数据，等这个周期结束就能算出「平均每期结余」。');
+    } else {
+      lines.push('历史平均每期结余 <b>' + money(hist.avgSurplus) + '</b>（按 ' + hist.count + ' 期）');
+      if (pend.length){
+        lines.push('要给 ' + pend.length + ' 笔预留每期攒 <b>' + money(budget.perPeriodReserve) + '</b>' +
+          '（分别摊 ' + budget.details.map(function(d){ return d.periods; }).join('、') + ' 期）');
+        if (budget.freePerPeriod < 0){
+          lines.push('每期能自由花 <span class="neg">' + money(budget.freePerPeriod) +
+            '</span>，光靠结余攒不够，要动之前的存款');
+        } else {
+          lines.push('每期还能自由花 <b>' + money(budget.freePerPeriod) + '</b>');
+        }
+      } else {
+        lines.push('没有预留时，每期可以自由花 <b>' + money(hist.avgSurplus) + '</b>');
+      }
+    }
+    sumEl.innerHTML = lines.join('<br>');
+  }
+
+  function renderResCats(){
+    $('#resCats').innerHTML = state.categories.map(function(c){
+      return '<button class="chip-cat' + (c.id === resCat ? ' on' : '') + '" data-cat="' + c.id + '">' +
+        '<span class="e">' + c.emoji + '</span>' + esc(c.name) + '</button>';
+    }).join('');
+  }
+
+  function openRes(item){
+    resEditing = item ? item.id : null;
+    resCat = item ? item.categoryId : (state.categories[0] && state.categories[0].id);
+    $('#resTitle').textContent = item ? '改这笔预留' : '新增预留';
+    $('#resAmount').value = item ? String(item.amount) : '';
+    $('#resDate').value = item ? item.date : addDays(dateKeyOf(new Date()), 10);
+    $('#resNote').value = item ? (item.note || '') : '';
+    renderResCats();
+    $('#resDelete').style.display = item ? '' : 'none';
+    $('#resRedeem').style.display = (item && !item.done) ? '' : 'none';
+    $('#resTip').innerHTML = '到那天之前，我会用「算一算」里的日均，比一比你手上还够不够这笔钱。提醒只在这个页面显示，不会推送。';
+    openSheet('#sheetRes');
+    setTimeout(function(){ if (!item) $('#resAmount').focus(); }, 260);
+  }
+
+  function redeemRes(r){
+    if (!r || r.done) return;
+    var today = dateKeyOf(new Date());
+    var d = r.date <= today ? r.date : today;
+    if (!confirm('把 ' + money(r.amount) + ' 记成一笔支出，并把这条预留标成已核销？')) return;
+    var exp = {
+      id: uid(), amount: r.amount, date: d,
+      categoryId: r.categoryId || (state.categories[0] && state.categories[0].id),
+      note: r.note || '核销', ts: new Date().toISOString()
+    };
+    state.expenses.push(exp);
+    r.done = true;
+    r.redeemedAt = today;
+    r.expenseId = exp.id;
+    save(); render(); closeSheets();
+    toast('已核销，并记了一笔支出');
+  }
+
+  $('#btnResAdd').addEventListener('click', function(){ openRes(null); });
+
+  $('#resCats').addEventListener('click', function(e){
+    var b = e.target.closest('[data-cat]');
+    if (!b) return;
+    resCat = b.getAttribute('data-cat');
+    renderResCats();
+  });
+
+  $('#resSave').addEventListener('click', function(){
+    var amt = round2(parseFloat($('#resAmount').value.replace(',', '.').trim()));
+    if (!isFinite(amt) || amt <= 0){ toast('先填金额'); $('#resAmount').focus(); return; }
+    var date = $('#resDate').value || dateKeyOf(new Date());
+    var note = $('#resNote').value.trim().slice(0, 16);
+
+    if (resEditing){
+      state.reservations.forEach(function(r){
+        if (r.id === resEditing){ r.amount = amt; r.date = date; r.note = note; r.categoryId = resCat; }
+      });
+    } else {
+      state.reservations.push({
+        id: uid(), amount: amt, date: date, note: note,
+        categoryId: resCat, done: false, ts: new Date().toISOString()
+      });
+    }
+    save(); render(); closeSheets(); toast('已保存');
+  });
+
+  $('#resRedeem').addEventListener('click', function(){
+    var r = state.reservations.filter(function(x){ return x.id === resEditing; })[0];
+    redeemRes(r);
+  });
+
+  $('#resDelete').addEventListener('click', function(){
+    if (!resEditing) return;
+    if (!confirm('删掉这条预留？')) return;
+    state.reservations = state.reservations.filter(function(r){ return r.id !== resEditing; });
+    save(); render(); closeSheets(); toast('已删除');
+  });
+
+  $('#resList').addEventListener('click', function(e){
+    var row = e.target.closest('[data-res]');
+    if (!row) return;
+    var id = row.getAttribute('data-res');
+    var r = state.reservations.filter(function(x){ return x.id === id; })[0];
+    if (r) openRes(r);
   });
 
   /* ---------------- sheets ---------------- */
@@ -807,7 +1149,12 @@ function projectSpending(sum, daily, target){
   $('#expDelete').addEventListener('click', function(){
     if (!editing.expense) return;
     if (!confirm('删掉这一笔？')) return;
-    state.expenses = state.expenses.filter(function(e){ return e.id !== editing.expense; });
+    var gone = editing.expense;
+    state.expenses = state.expenses.filter(function(e){ return e.id !== gone; });
+    // 这一笔如果是核销产生的，把那条预留退回「未核销」
+    state.reservations.forEach(function(r){
+      if (r.expenseId === gone){ r.done = false; r.expenseId = null; r.redeemedAt = null; }
+    });
     save(); render(); closeSheets(); toast('已删除');
   });
 
