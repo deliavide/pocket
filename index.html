@@ -156,6 +156,8 @@
   .order-row[hidden]{display:none}
   .order-btn{flex:1; padding:9px 0; border-radius:11px; background:var(--bg); font-size:13px; color:var(--muted)}
   .order-btn:disabled{opacity:.38}
+  .order-hint{font-size:11.5px; color:var(--faint); margin-top:7px; line-height:1.5}
+  .order-hint:empty{display:none}
 
   /* ---------- category bars ---------- */
   .catrow{display:flex; align-items:center; gap:10px; padding:7px 0}
@@ -171,8 +173,14 @@
   .day{display:flex; justify-content:space-between; align-items:baseline; padding:12px 2px 6px; font-size:12px; color:var(--faint)}
   .day:first-child{padding-top:2px}
   .day .sum{font-size:12px; color:var(--muted)}
-  .entry{display:flex; align-items:center; gap:10px; padding:9px 2px; border-radius:12px}
+  .entry{display:flex; align-items:center; gap:10px; padding:9px 2px; border-radius:12px;
+    -webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
   .entry:active{background:var(--line)}
+  .entry.dragging{background:var(--card); box-shadow:0 12px 28px rgba(16,24,40,.22); z-index:5; position:relative; touch-action:none}
+  @media (prefers-color-scheme: dark){ .entry.dragging{box-shadow:0 12px 28px rgba(0,0,0,.6)} }
+  body.dragging-now{cursor:grabbing; -webkit-user-select:none; user-select:none}
+  .flow-hint{font-size:11.5px; color:var(--faint); padding:0 2px 8px; line-height:1.5}
+  .flow-hint:empty{display:none; padding:0}
   .entry .ico{width:34px; height:34px; border-radius:11px; background:var(--bg); display:grid; place-items:center; font-size:16px; flex:none}
   .entry.income .ico{background:var(--accent-weak)}
   .entry .mid{flex:1; min-width:0}
@@ -330,6 +338,7 @@
 
 <section class="card">
   <div class="card-head"><h2>流水</h2><span class="link" style="color:var(--faint)" id="flowCount"></span></div>
+  <div class="flow-hint" id="flowHint"></div>
   <div id="flow"></div>
 </section>
 
@@ -357,6 +366,7 @@
       <button class="order-btn" id="expUp">↑ 上移</button>
       <button class="order-btn" id="expDown">↓ 下移</button>
     </div>
+    <div class="order-hint" id="expOrderHint"></div>
     <div class="sheet-actions">
       <button class="btn danger" id="expDelete" style="flex:0 0 76px">删除</button>
       <button class="btn primary block" id="expSave">保存</button>
@@ -615,13 +625,21 @@ function periodHistory(data, tk){
   return { periods: periods, avgSurplus: avg, count: periods.length };
 }
 
+// 「扣掉攒钱之后，这期理想还剩多少」
+// 例：这期预计剩 80，2 期后有一笔 100 的核销 → 每期要留 100/2 = 50 → 理想剩余 30
+function idealRemaining(projectedLeft, reserves, anchorDays, tk){
+  var budget = budgetAfterReserve(null, reserves, anchorDays, tk);
+  var left = round2((Number(projectedLeft) || 0) - budget.perPeriodReserve);
+  return { perPeriodReserve: budget.perPeriodReserve, ideal: left, details: budget.details };
+}
+
 // 为了几笔预留，每期得从结余里匀出多少；匀完还剩多少能自由花
-// 期数 = 从现在到核销日之间，会到账几次（5/15/25 这样的日子），不足一次按一次算
+// 期数 = 今天到核销日之间隔着的结算日数 + 1（当前这一期也算一期），至少 1 期
 function budgetAfterReserve(avgSurplus, reserves, anchorDays, tk){
   var perPeriod = 0;
   var details = [];
   (reserves || []).forEach(function(r){
-    var n = Math.max(1, futurePaydayCount(anchorDays, tk, r.date));
+    var n = Math.max(1, futurePaydayCount(anchorDays, tk, r.date) + 1);
     var share = round2((Number(r.amount) || 0) / n);
     perPeriod += share;
     details.push({ id: r.id, periods: n, share: share });
@@ -982,6 +1000,13 @@ function reserveChecks(sum, daily, reserves, opts){
     var el = $('#flow');
     var list = allEntries();
     $('#flowCount').textContent = list.length ? '共 ' + list.length + ' 笔' : '';
+
+    var dayCount = {};
+    state.expenses.forEach(function(e){ dayCount[e.date] = (dayCount[e.date] || 0) + 1; });
+    var canDrag = Object.keys(dayCount).some(function(d){ return dayCount[d] > 1; });
+    var hintEl = $('#flowHint');
+    if (hintEl) hintEl.textContent = canDrag ? '同一天里有多笔时，长按任意一笔可以直接拖动排序' : '';
+
     if (!list.length){
       el.innerHTML = '<div class="empty">还没有任何记录</div>';
       return;
@@ -1013,7 +1038,7 @@ function reserveChecks(sum, daily, reserves, opts){
         }
         var c = catOf(it.categoryId);
         var sub = it.note ? esc(it.note) : '支出';
-        return '<div class="entry" data-kind="expense" data-id="' + it.id + '">' +
+        return '<div class="entry" data-kind="expense" data-id="' + it.id + '" data-date="' + it.date + '">' +
           '<div class="ico">' + c.emoji + '</div>' +
           '<div class="mid"><div class="t">' + esc(c.name) + '</div><div class="s">' + sub + '</div></div>' +
           '<div class="amt num">-' + money(it.amount) + '</div></div>';
@@ -1076,12 +1101,14 @@ function reserveChecks(sum, daily, reserves, opts){
     var when = follow ? mdCn(target) + '（到账前一天）' : mdCn(target);
     var html = '';
 
-    // 每期可自由花 = 平均每期结余 − 每期要为预留攒的钱（放在「预计还剩」右边）
-    var hist = periodHistory(state, s.today);
-    var budget = budgetAfterReserve(hist.avgSurplus, pendingRes(), state.anchorDays, s.today);
-    var freeTxt = budget.freePerPeriod === null ? '—' : money(budget.freePerPeriod);
-    var freeCls = (budget.freePerPeriod !== null && budget.freePerPeriod < 0) ? ' neg' : '';
-    var aside = '<div class="pr-aside"><span>每期可自由花</span><b class="num' + freeCls + '">' + freeTxt + '</b></div>';
+    // 扣预留后的理想剩余 = 这期的预计剩余 − 每期要为预留攒的钱（放在「预计还剩」右边）
+    var pendRes = pendingRes();
+    var ideal = idealRemaining(p.left, pendRes, state.anchorDays, s.today);
+    var aside = '';
+    if (pendRes.length){
+      aside = '<div class="pr-aside"><span>扣预留后理想剩余</span>' +
+              '<b class="num' + (ideal.ideal < 0 ? ' neg' : '') + '">' + money(ideal.ideal) + '</b></div>';
+    }
 
     if (p.left >= 0) {
       html += '<div class="pr-main">' +
@@ -1235,23 +1262,24 @@ function reserveChecks(sum, daily, reserves, opts){
       el.innerHTML = html;
     }
 
-    // 每期还能自由花多少：平均每期结余 - 每期要为预留攒的钱
-    var hist = periodHistory(state, s.today);
+    // 这期预计剩多少 → 每期要留多少给预留 → 扣完还剩多少
+    var dly = planDailyValue();
+    if (dly === null) dly = actualDaily(s);
+    var target = planTargetValue(s);
+    var proj = projectSpending(s, dly === null ? 0 : dly, target);
     var pend = pendingRes();
-    var budget = budgetAfterReserve(hist.avgSurplus, pend, state.anchorDays, s.today);
+    var ideal = idealRemaining(proj.left, pend, state.anchorDays, s.today);
     var lines = [];
-    if (hist.avgSurplus === null){
-      lines.push('还没有完整账期数据，等这个周期结束就能算出「平均每期结余」。');
+    if (!pend.length){
+      lines.push('没有预留时，理想剩余就是「算一算」里撑到 ' + mdCn(target) + ' 预计剩下的 ' + money(proj.left) + '。');
     } else {
-      lines.push('历史平均每期结余 <b>' + money(hist.avgSurplus) + '</b>（按 ' + hist.count + ' 期）');
-      if (pend.length){
-        lines.push('要给 ' + pend.length + ' 笔预留每期攒 <b>' + money(budget.perPeriodReserve) + '</b>' +
-          '（分别摊 ' + budget.details.map(function(d){ return d.periods; }).join('、') + ' 期）');
-        if (budget.freePerPeriod < 0){
-          lines.push('所以每期可自由花是负数，光靠结余攒不够，要动之前的存款');
-        }
+      lines.push('这期撑到 ' + mdCn(target) + ' 预计剩 <b>' + money(proj.left) + '</b>');
+      lines.push('每期为 ' + pend.length + ' 笔预留留出 <b>' + money(ideal.perPeriodReserve) + '</b>' +
+        '（核销金额 ÷ 到那天前的期数，分别摊 ' + ideal.details.map(function(d){ return d.periods; }).join('、') + ' 期）');
+      if (ideal.ideal < 0){
+        lines.push('扣完理想剩余 <span class="neg">' + money(ideal.ideal) + '</span>，这期的余钱不够攒，得动之前的存款');
       } else {
-        lines.push('没有预留，每期结余都能自由支配');
+        lines.push('扣完理想剩余 <b>' + money(ideal.ideal) + '</b>');
       }
     }
     sumEl.innerHTML = lines.join('<br>');
@@ -1413,17 +1441,21 @@ function reserveChecks(sum, daily, reserves, opts){
   }
 
   // 同一天内的排序按钮：第一笔不能上移，最后一笔不能下移
+  // 只有一笔时也把按钮显示出来（两个都置灰），不然会以为没这个功能
   function updateOrderButtons(item){
     var row = $('#expOrderRow');
     if (!item){
       row.hidden = true;
       return;
     }
+    row.hidden = false;
     var list = dayExpenses(item.date);
     var i = list.map(function(e){ return e.id; }).indexOf(item.id);
-    row.hidden = list.length < 2;
     $('#expUp').disabled = i <= 0;
     $('#expDown').disabled = i < 0 || i >= list.length - 1;
+    $('#expOrderHint').textContent = list.length < 2
+      ? '这天只有这一笔，多记几笔就能调顺序'
+      : '调整这一笔在 ' + mdCn(item.date) + ' 里的先后顺序';
   }
 
   $('#expUp').addEventListener('click', function(){
@@ -1539,6 +1571,7 @@ function reserveChecks(sum, daily, reserves, opts){
 
   /* -------- flow tap -------- */
   $('#flow').addEventListener('click', function(e){
+    if (dragState.suppressClick) return;
     var row = e.target.closest('.entry');
     if (!row) return;
     var id = row.getAttribute('data-id');
@@ -1550,6 +1583,125 @@ function reserveChecks(sum, daily, reserves, opts){
       if (ex) openExpense(ex);
     }
   });
+
+  /* -------- 长按拖动排序（同一天内） -------- */
+  var dragState = { pending: null, active: false, el: null, id: null, date: null,
+                    startY: 0, baseCenter: 0, timer: null, suppressClick: false };
+
+  function measureCenter(el){
+    var t = el.style.transform;
+    el.style.transform = 'none';
+    var r = el.getBoundingClientRect();
+    el.style.transform = t;
+    return r.top + r.height / 2;
+  }
+
+  function sameDayEntries(){
+    return Array.prototype.slice.call(
+      document.querySelectorAll('#flow .entry[data-kind="expense"][data-date="' + dragState.date + '"]')
+    );
+  }
+
+  function startDrag(el, y){
+    dragState.active = true;
+    dragState.el = el;
+    dragState.id = el.getAttribute('data-id');
+    dragState.date = el.getAttribute('data-date');
+    dragState.baseCenter = measureCenter(el);
+    el.classList.add('dragging');
+    document.body.classList.add('dragging-now');
+    moveDrag(y);
+  }
+
+  function moveDrag(y){
+    if (!dragState.active) return;
+    var el = dragState.el;
+    el.style.transform = 'translateY(' + (y - dragState.baseCenter) + 'px)';
+
+    var list = sameDayEntries();
+    if (list.length < 2) return;
+
+    var target = null;
+    for (var i = 0; i < list.length; i++){
+      var s = list[i];
+      if (s === el) continue;
+      var r = s.getBoundingClientRect();
+      if (y < r.top + r.height / 2) { target = s; break; }
+    }
+    if (target){
+      if (el.nextElementSibling !== target) el.parentNode.insertBefore(el, target);
+    } else {
+      var last = list[list.length - 1];
+      if (last !== el) last.parentNode.insertBefore(el, last.nextSibling);
+    }
+    dragState.baseCenter = measureCenter(el);
+  }
+
+  function endDrag(){
+    if (!dragState.active) return;
+    var el = dragState.el;
+    dragState.active = false;
+    el.classList.remove('dragging');
+    el.style.transform = '';
+    document.body.classList.remove('dragging-now');
+
+    var list = sameDayEntries();
+    var changed = false;
+    list.forEach(function(node, i){
+      var id = node.getAttribute('data-id');
+      for (var k = 0; k < state.expenses.length; k++){
+        if (state.expenses[k].id === id){
+          if (state.expenses[k].seq !== i + 1) changed = true;
+          state.expenses[k].seq = i + 1;
+          break;
+        }
+      }
+    });
+    dragState.suppressClick = true;
+    setTimeout(function(){ dragState.suppressClick = false; }, 80);
+    if (changed){
+      save();
+      render();
+      toast('顺序已保存');
+    }
+  }
+
+  $('#flow').addEventListener('pointerdown', function(e){
+    var row = e.target.closest('.entry');
+    if (!row || row.getAttribute('data-kind') !== 'expense') return;
+    dragState.pending = row;
+    dragState.startY = e.clientY;
+    clearTimeout(dragState.timer);
+    dragState.timer = setTimeout(function(){
+      var el = dragState.pending;
+      dragState.pending = null;
+      if (!el) return;
+      startDrag(el, dragState.startY);
+      if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) {} }
+    }, 320);
+  });
+
+  document.addEventListener('pointermove', function(e){
+    if (dragState.pending && Math.abs(e.clientY - dragState.startY) > 10){
+      clearTimeout(dragState.timer);
+      dragState.pending = null;
+    }
+    if (dragState.active){
+      if (e.cancelable) e.preventDefault();
+      moveDrag(e.clientY);
+    }
+  }, { passive: false });
+
+  function stopDrag(){
+    clearTimeout(dragState.timer);
+    dragState.pending = null;
+    if (dragState.active) endDrag();
+  }
+  document.addEventListener('pointerup', stopDrag);
+  document.addEventListener('pointercancel', stopDrag);
+  document.addEventListener('touchmove', function(e){
+    if (dragState.active && e.cancelable) e.preventDefault();
+  }, { passive: false });
 
   /* -------- categories -------- */
   function renderCatManage(){
