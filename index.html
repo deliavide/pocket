@@ -17,15 +17,28 @@
     --line:#e7e9ee; --accent:#0f7a63; --accent-weak:#e6f4f0; --danger:#d92d4b;
     --radius:20px; --shadow:0 1px 2px rgba(16,24,40,.04), 0 10px 30px rgba(16,24,40,.06);
     --hero-a:#0f1a17; --hero-b:#123b31;
-    --scrim:rgba(241,242,244,.48); --scrim-solid:rgba(241,242,244,.9);
+    --scrim:rgba(241,242,244,.40); --scrim-solid:rgba(241,242,244,.9);
+    --card-rgb:255,255,255; --card-alpha:.76;
   }
+  /* ---- 主题色预设 ---- */
+  :root[data-accent="blue"]{ --accent:#2563eb; --accent-weak:#e5edff; --hero-a:#0d1a2b; --hero-b:#123a63 }
+  :root[data-accent="purple"]{ --accent:#7c3aed; --accent-weak:#f0e9ff; --hero-a:#191228; --hero-b:#2f1d52 }
+  :root[data-accent="pink"]{ --accent:#db2777; --accent-weak:#fde7f1; --hero-a:#2a1020; --hero-b:#4a1730 }
+  :root[data-accent="orange"]{ --accent:#ea580c; --accent-weak:#ffeddf; --hero-a:#2a1608; --hero-b:#4a2a10 }
+  :root[data-accent="slate"]{ --accent:#475569; --accent-weak:#e9edf2; --hero-a:#10151c; --hero-b:#243144 }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#08090b; --card:#14171c; --text:#eef1f5; --muted:#98a2b0; --faint:#6d7683;
       --line:#222831; --accent:#3ddcae; --accent-weak:#10261f; --danger:#ff6b81;
       --shadow:none; --hero-a:#0b1210; --hero-b:#12332b;
-      --scrim:rgba(8,9,11,.45); --scrim-solid:rgba(8,9,11,.92);
+      --scrim:rgba(8,9,11,.38); --scrim-solid:rgba(8,9,11,.92);
+      --card-rgb:20,23,28; --card-alpha:.72;
     }
+    :root[data-accent="blue"]{ --accent:#6ea8fe; --accent-weak:#10203a; --hero-a:#080e18; --hero-b:#123a63 }
+    :root[data-accent="purple"]{ --accent:#b18cff; --accent-weak:#1f1533; --hero-a:#0f0a1a; --hero-b:#2f1d52 }
+    :root[data-accent="pink"]{ --accent:#ff7ab0; --accent-weak:#33101f; --hero-a:#1a0a12; --hero-b:#4a1730 }
+    :root[data-accent="orange"]{ --accent:#ffa46b; --accent-weak:#331b0d; --hero-a:#1a0e06; --hero-b:#4a2a10 }
+    :root[data-accent="slate"]{ --accent:#94a3b8; --accent-weak:#1a2029; --hero-a:#0a0d12; --hero-b:#243144 }
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0}
@@ -50,6 +63,48 @@
     background:var(--scrim); pointer-events:none;
   }
   body.has-bg .bar-fixed{background:linear-gradient(to top, var(--scrim-solid) 55%, transparent)}
+
+  /* 有背景图时把卡片改成半透明毛玻璃，让图片透出来 */
+  body.has-bg{
+    --card:rgba(var(--card-rgb), var(--card-alpha));
+    --bg:rgba(255,255,255,.34);
+    --line:rgba(0,0,0,.08);
+    --muted:#5c6570;
+    --faint:#7d8794;
+  }
+  @media (prefers-color-scheme: dark){
+    body.has-bg{
+      --bg:rgba(255,255,255,.09);
+      --line:rgba(255,255,255,.10);
+      --muted:#aab5c2;
+      --faint:#8792a0;
+    }
+  }
+  body.has-bg .hero{
+    background:linear-gradient(160deg, var(--hero-b), var(--hero-a));
+    opacity:.94;
+  }
+  @media (prefers-color-scheme: dark){
+    body.has-bg .hero{
+      background:radial-gradient(120% 120% at 100% 0%, rgba(29,90,74,.72) 0%, rgba(18,51,43,.7) 42%, rgba(11,18,16,.82) 100%);
+    }
+  }
+  body.has-bg .card,
+  body.has-bg .sheet .panel,
+  body.has-bg .icon-btn,
+  body.has-bg .btn.ghost,
+  body.has-bg .entry.dragging{
+    -webkit-backdrop-filter:blur(16px) saturate(1.15);
+    backdrop-filter:blur(16px) saturate(1.15);
+  }
+  body.has-bg .card,
+  body.has-bg .sheet .panel{
+    border:1px solid rgba(255,255,255,.28);
+  }
+  @media (prefers-color-scheme: dark){
+    body.has-bg .card,
+    body.has-bg .sheet .panel{border-color:rgba(255,255,255,.07)}
+  }
   h1,h2,h3,p{margin:0}
   button{font:inherit; color:inherit; border:0; background:none; cursor:pointer}
   .num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum"}
@@ -247,6 +302,13 @@
   .bg-preview{width:104px; height:64px; border-radius:11px; flex:none; border:1px solid var(--line);
     background:var(--bg) center/cover no-repeat}
   .bg-actions{display:flex; gap:8px; flex-wrap:wrap}
+  .swatches{display:flex; gap:10px; flex-wrap:wrap; margin-top:2px}
+  .swatch{width:34px; height:34px; border-radius:50%; border:0; padding:0; flex:none;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .swatch.on{box-shadow:0 0 0 2px var(--card), 0 0 0 4px var(--accent)}
+  .alpha-row{display:flex; align-items:center; gap:10px}
+  .alpha-end{font-size:11.5px; color:var(--faint); flex:none}
+  .range{flex:1; min-width:0; accent-color:var(--accent); height:26px}
   .addrow{display:flex; gap:8px; margin-top:10px; align-items:center}
   .addrow input{flex:1; min-width:0; background:var(--bg); border:0; border-radius:12px; padding:11px 12px; font-size:15px; color:var(--text); outline:none}
   .addrow .mini{padding:11px 14px; border-radius:12px; flex:none}
@@ -404,6 +466,9 @@
     <div class="chips" id="resCats"></div>
     <div class="fields">
       <label class="field"><span>核销日期</span><input id="resDate" type="date"></label>
+      <label class="field"><span>分摊起始日</span><input id="resStart" type="date"></label>
+    </div>
+    <div class="fields">
       <label class="field"><span>说明（可选）</span><input id="resNote" type="text" maxlength="16" placeholder="例如 双十一"></label>
     </div>
     <div class="note" id="resTip"></div>
@@ -453,6 +518,15 @@
       </div>
     </div>
     <div class="note">从手机相册选一张图，会自动压到 1600px 以内再存（不占太多空间），铺满整屏并盖一层蒙版保证字看得清。图只存在这台设备上，导出备份时会一起带走。</div>
+    <div class="label">主题色</div>
+    <div class="swatches" id="accentPick"></div>
+    <div class="label">卡片不透明度 <span id="alphaVal">76%</span></div>
+    <div class="alpha-row">
+      <span class="alpha-end">更透</span>
+      <input id="alphaRange" class="range" type="range" min="35" max="95" step="1" value="76">
+      <span class="alpha-end">更实</span>
+    </div>
+    <div class="note">不透明度只影响「设了背景图」时的毛玻璃卡片：调低能更清楚看到背景图，调高文字对比更强。没设背景图时始终保持原样。</div>
     <div class="label">数据</div>
     <div class="mrow">
       <div class="nm">导出备份（JSON）</div>
@@ -625,29 +699,38 @@ function periodHistory(data, tk){
   return { periods: periods, avgSurplus: avg, count: periods.length };
 }
 
-// 「扣掉攒钱之后，这期理想还剩多少」
-// 例：这期预计剩 80，2 期后有一笔 100 的核销 → 每期要留 100/2 = 50 → 理想剩余 30
-function idealRemaining(projectedLeft, reserves, anchorDays, tk){
-  var budget = budgetAfterReserve(null, reserves, anchorDays, tk);
-  var left = round2((Number(projectedLeft) || 0) - budget.perPeriodReserve);
-  return { perPeriodReserve: budget.perPeriodReserve, ideal: left, details: budget.details };
+// 一笔预留要分摊几期、已经分摊了几期
+//   总期数 N = 分摊起始日 → 核销日之间隔着的结算日数 + 1
+//   已分摊 k = 分摊起始日 → 今天之间隔着的结算日数 + 1（起始日还没到就是 0，最多不超过 N）
+function reserveAllocation(startKey, dueKey, todayKey, anchorDays){
+  var s = startKey || todayKey;
+  var total = futurePaydayCount(anchorDays, s, dueKey) + 1;
+  if (total < 1) total = 1;
+  var elapsed = futurePaydayCount(anchorDays, s, todayKey) + 1;
+  if (todayKey < s) elapsed = 0;
+  if (elapsed > total) elapsed = total;
+  if (elapsed < 0) elapsed = 0;
+  // 起始日晚于核销日这种异常情况，按只摊 1 期算
+  if (dueKey < s) { total = 1; elapsed = 1; }
+  return { total: total, elapsed: elapsed };
 }
 
-// 为了几笔预留，每期得从结余里匀出多少；匀完还剩多少能自由花
-// 期数 = 今天到核销日之间隔着的结算日数 + 1（当前这一期也算一期），至少 1 期
-function budgetAfterReserve(avgSurplus, reserves, anchorDays, tk){
-  var perPeriod = 0;
+// 「扣掉该为核销攒的那部分之后，理想还剩多少」
+// 理想剩余 = 理论剩余 − Σ(核销金额 × 已分摊期数 / 总期数)
+// 例：理论剩余 80，核销 100，从今天起 2 期摊完 → 已摊 1 期 → 80 − 100×1/2 = 30
+function idealRemaining(projectedLeft, reserves, anchorDays, todayKey){
+  var deduct = 0;
   var details = [];
   (reserves || []).forEach(function(r){
-    var n = Math.max(1, futurePaydayCount(anchorDays, tk, r.date) + 1);
-    var share = round2((Number(r.amount) || 0) / n);
-    perPeriod += share;
-    details.push({ id: r.id, periods: n, share: share });
+    var a = reserveAllocation(r.start, r.date, todayKey, anchorDays);
+    var part = round2((Number(r.amount) || 0) * a.elapsed / a.total);
+    deduct += part;
+    details.push({ id: r.id, total: a.total, elapsed: a.elapsed, amount: part });
   });
-  perPeriod = round2(perPeriod);
+  deduct = round2(deduct);
   return {
-    perPeriodReserve: perPeriod,
-    freePerPeriod: avgSurplus == null ? null : round2(avgSurplus - perPeriod),
+    deduction: deduct,
+    ideal: round2((Number(projectedLeft) || 0) - deduct),
     details: details
   };
 }
@@ -752,6 +835,7 @@ function reserveChecks(sum, daily, reserves, opts){
       reserveWithIncome: true,
       reserveIncome: null,
       background: null,
+      ui: { accent: 'teal', alpha: 76 },
       plan: { daily: null, target: null, follow: true }
     };
   }
@@ -772,6 +856,13 @@ function reserveChecks(sum, daily, reserves, opts){
       if (d.reserveWithIncome === undefined) d.reserveWithIncome = true;
       if (d.reserveIncome === undefined) d.reserveIncome = null;
       if (typeof d.background !== 'string' || !d.background) d.background = null;
+      if (!d.ui || typeof d.ui !== 'object') d.ui = { accent: 'teal', alpha: 76 };
+      if (!d.ui.accent) d.ui.accent = 'teal';
+      if (typeof d.ui.alpha !== 'number') d.ui.alpha = 76;
+      // 老的预留言没有分摊起始日：按它当初登记的日期算
+      d.reservations.forEach(function(r){
+        if (!r.start) r.start = r.ts ? String(r.ts).slice(0, 10) : dateKeyOf(new Date());
+      });
       d = migrateSeq(d);
       return d;
     } catch (e) { return defaults(); }
@@ -798,6 +889,58 @@ function reserveChecks(sum, daily, reserves, opts){
     try { localStorage.setItem(KEY, JSON.stringify(state)); return true; }
     catch (e) { toast('保存失败，可能是浏览器存储被占满'); return false; }
   }
+
+  /* ---------------- 外观：主题色 / 卡片不透明度 ---------------- */
+  var ACCENTS = [
+    { id:'teal',   name:'墨绿', color:'#0f7a63' },
+    { id:'blue',   name:'湖蓝', color:'#2563eb' },
+    { id:'purple', name:'紫',   color:'#7c3aed' },
+    { id:'pink',   name:'粉',   color:'#db2777' },
+    { id:'orange', name:'橙',   color:'#ea580c' },
+    { id:'slate',  name:'灰蓝', color:'#475569' }
+  ];
+
+  function applyUi(){
+    var ui = state.ui || {};
+    var accent = ui.accent || 'teal';
+    if (accent === 'teal') document.documentElement.removeAttribute('data-accent');
+    else document.documentElement.setAttribute('data-accent', accent);
+
+    var alpha = typeof ui.alpha === 'number' ? ui.alpha : 76;
+    document.documentElement.style.setProperty('--card-alpha', (alpha / 100).toFixed(2));
+
+    var pick = $('#accentPick');
+    if (pick){
+      Array.prototype.forEach.call(pick.children, function(b){
+        b.classList.toggle('on', b.getAttribute('data-accent') === accent);
+      });
+    }
+    var rng = $('#alphaRange');
+    if (rng && Number(rng.value) !== alpha) rng.value = alpha;
+    var lbl = $('#alphaVal');
+    if (lbl) lbl.textContent = alpha + '%';
+  }
+
+  function renderSwatches(){
+    var pick = $('#accentPick');
+    if (!pick) return;
+    pick.innerHTML = ACCENTS.map(function(a){
+      return '<button class="swatch" data-accent="' + a.id + '" aria-label="' + a.name +
+             '" title="' + a.name + '" style="background:' + a.color + '"></button>';
+    }).join('');
+  }
+
+  $('#accentPick').addEventListener('click', function(e){
+    var b = e.target.closest('[data-accent]');
+    if (!b) return;
+    state.ui.accent = b.getAttribute('data-accent');
+    save(); applyUi(); toast('主题色已换');
+  });
+
+  $('#alphaRange').addEventListener('input', function(){
+    state.ui.alpha = Math.round(Number(this.value) || 76);
+    save(); applyUi();
+  });
 
   /* ---------------- 背景图 ---------------- */
   function applyBackground(){
@@ -1106,7 +1249,7 @@ function reserveChecks(sum, daily, reserves, opts){
     var ideal = idealRemaining(p.left, pendRes, state.anchorDays, s.today);
     var aside = '';
     if (pendRes.length){
-      aside = '<div class="pr-aside"><span>扣预留后理想剩余</span>' +
+      aside = '<div class="pr-aside"><span>扣预留后剩余</span>' +
               '<b class="num' + (ideal.ideal < 0 ? ' neg' : '') + '">' + money(ideal.ideal) + '</b></div>';
     }
 
@@ -1264,7 +1407,7 @@ function reserveChecks(sum, daily, reserves, opts){
       el.innerHTML = html;
     }
 
-    // 这期预计剩多少 → 每期要留多少给预留 → 扣完还剩多少
+    // 这期预计剩多少 → 每笔核销已摊到几期 → 扣完还剩多少
     var dly = planDailyValue();
     if (dly === null) dly = actualDaily(s);
     var target = planTargetValue(s);
@@ -1276,8 +1419,10 @@ function reserveChecks(sum, daily, reserves, opts){
       lines.push('没有预留时，理想剩余就是「算一算」里撑到 ' + mdCn(target) + ' 预计剩下的 ' + money(proj.left) + '。');
     } else {
       lines.push('这期撑到 ' + mdCn(target) + ' 预计剩 <b>' + money(proj.left) + '</b>');
-      lines.push('每期为 ' + pend.length + ' 笔预留留出 <b>' + money(ideal.perPeriodReserve) + '</b>' +
-        '（核销金额 ÷ 到那天前的期数，分别摊 ' + ideal.details.map(function(d){ return d.periods; }).join('、') + ' 期）');
+      var parts = ideal.details.map(function(d){
+        return '已摊 ' + d.elapsed + '/' + d.total + ' 期 → ' + money(d.amount);
+      });
+      lines.push('该为核销攒下的部分：<b>' + money(ideal.deduction) + '</b>（' + parts.join('；') + '）');
       if (ideal.ideal < 0){
         lines.push('扣完理想剩余 <span class="neg">' + money(ideal.ideal) + '</span>，这期的余钱不够攒，得动之前的存款');
       } else {
@@ -1300,11 +1445,13 @@ function reserveChecks(sum, daily, reserves, opts){
     $('#resTitle').textContent = item ? '改这笔预留' : '新增预留';
     $('#resAmount').value = item ? String(item.amount) : '';
     $('#resDate').value = item ? item.date : addDays(dateKeyOf(new Date()), 10);
+    $('#resStart').value = item ? (item.start || item.date) : dateKeyOf(new Date());
     $('#resNote').value = item ? (item.note || '') : '';
     renderResCats();
     $('#resDelete').style.display = item ? '' : 'none';
     $('#resRedeem').style.display = (item && !item.done) ? '' : 'none';
-    $('#resTip').innerHTML = '到那天之前，我会用「算一算」里的日均，比一比你手上还够不够这笔钱。提醒只在这个页面显示，不会推送。';
+    $('#resTip').innerHTML = '分摊起始日 = 你从哪天开始为这笔钱攒。分摊期数 = 起始日到核销日之间隔了几个结算日 + 1；' +
+      '已分摊期数 = 起始日到今天隔了几个结算日 + 1。理想剩余只扣「已分摊」的那部分。';
     openSheet('#sheetRes');
     setTimeout(function(){ if (!item) $('#resAmount').focus(); }, 260);
   }
@@ -1364,15 +1511,19 @@ function reserveChecks(sum, daily, reserves, opts){
     var amt = round2(parseFloat($('#resAmount').value.replace(',', '.').trim()));
     if (!isFinite(amt) || amt <= 0){ toast('先填金额'); $('#resAmount').focus(); return; }
     var date = $('#resDate').value || dateKeyOf(new Date());
+    var start = $('#resStart').value || dateKeyOf(new Date());
+    if (start > date) { toast('分摊起始日不能晚于核销日'); return; }
     var note = $('#resNote').value.trim().slice(0, 16);
 
     if (resEditing){
       state.reservations.forEach(function(r){
-        if (r.id === resEditing){ r.amount = amt; r.date = date; r.note = note; r.categoryId = resCat; }
+        if (r.id === resEditing){
+          r.amount = amt; r.date = date; r.start = start; r.note = note; r.categoryId = resCat;
+        }
       });
     } else {
       state.reservations.push({
-        id: uid(), amount: amt, date: date, note: note,
+        id: uid(), amount: amt, date: date, start: start, note: note,
         categoryId: resCat, done: false, ts: new Date().toISOString()
       });
     }
@@ -1838,10 +1989,12 @@ function reserveChecks(sum, daily, reserves, opts){
   });
 
   /* -------- boot -------- */
+  renderSwatches();
+  applyUi();
   applyBackground();
   render();
   window.addEventListener('storage', function(e){
-    if (e.key === KEY) { state = load(); applyBackground(); render(); }
+    if (e.key === KEY) { state = load(); applyUi(); applyBackground(); render(); }
   });
 })();
 </script>
